@@ -2775,7 +2775,7 @@ func TestDiffViewerVimNavigationKeys(t *testing.T) {
 			wantCmd:    CommandRedraw,
 		},
 		{
-			name:       "Ctrl+d moves cursor down half page",
+			name:       "Ctrl+d moves cursor down half page and centers",
 			start:      10,
 			cursor:     10,
 			key:        vaxis.Key{Keycode: 'd', Modifiers: vaxis.ModCtrl},
@@ -2784,7 +2784,7 @@ func TestDiffViewerVimNavigationKeys(t *testing.T) {
 			wantCmd:    CommandRedraw,
 		},
 		{
-			name:       "Page Down moves cursor down half page",
+			name:       "Page Down moves cursor down half page and centers",
 			start:      10,
 			cursor:     10,
 			key:        vaxis.Key{Keycode: vaxis.KeyPgDown},
@@ -2793,20 +2793,20 @@ func TestDiffViewerVimNavigationKeys(t *testing.T) {
 			wantCmd:    CommandRedraw,
 		},
 		{
-			name:       "Ctrl+u moves cursor up half page",
+			name:       "Ctrl+u moves cursor up half page and centers",
 			start:      10,
 			cursor:     10,
 			key:        vaxis.Key{Keycode: 'u', Modifiers: vaxis.ModCtrl},
-			wantScroll: 6,
+			wantScroll: 2,
 			wantCursor: 6,
 			wantCmd:    CommandRedraw,
 		},
 		{
-			name:       "Page Up moves cursor up half page",
+			name:       "Page Up moves cursor up half page and centers",
 			start:      10,
 			cursor:     10,
 			key:        vaxis.Key{Keycode: vaxis.KeyPgUp},
-			wantScroll: 6,
+			wantScroll: 2,
 			wantCursor: 6,
 			wantCmd:    CommandRedraw,
 		},
@@ -4911,26 +4911,26 @@ func TestDiffViewerJumpCommitKeys(t *testing.T) {
 	}
 	viewer.Layout(Tight(Size{Width: 80, Height: 10}))
 
-	cmd, err := viewer.HandleEvent(vaxis.Key{Text: "J", Keycode: 'J'})
+	cmd, err := viewer.HandleEvent(vaxis.Key{Text: "L", Keycode: 'L'})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cmd != CommandRedraw {
-		t.Fatalf("J command = %v, want redraw", cmd)
+		t.Fatalf("L command = %v, want redraw", cmd)
 	}
 	if got, want := viewer.cursor.Row, 2; got != want {
-		t.Fatalf("cursor row after J = %d, want %d", got, want)
+		t.Fatalf("cursor row after L = %d, want %d", got, want)
 	}
 
-	cmd, err = viewer.HandleEvent(vaxis.Key{Text: "K", Keycode: 'K'})
+	cmd, err = viewer.HandleEvent(vaxis.Key{Text: "H", Keycode: 'H'})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cmd != CommandRedraw {
-		t.Fatalf("K command = %v, want redraw", cmd)
+		t.Fatalf("H command = %v, want redraw", cmd)
 	}
 	if got, want := viewer.cursor.Row, 0; got != want {
-		t.Fatalf("cursor row after K = %d, want %d", got, want)
+		t.Fatalf("cursor row after H = %d, want %d", got, want)
 	}
 }
 

@@ -236,8 +236,8 @@ var helpKeybinds = []helpKeybind{
 	{Key: "j/k, arrows", READMEKey: "`j`/`k`, arrows", Action: "Move"},
 	{Key: "h/l", READMEKey: "`h`/`l`", Action: "Move horizontally"},
 	{Key: "gg / G", READMEKey: "`gg` / `G`", Action: "Top / bottom"},
-	{Key: "Ctrl-d / Ctrl-u", READMEKey: "`Ctrl-d` / `Ctrl-u`", Action: "Half-page down / up"},
-	{Key: "J / K", READMEKey: "`J` / `K`", Action: "Next / previous commit"},
+	{Key: "Ctrl-d / Ctrl-u, J / K", READMEKey: "`Ctrl-d` / `Ctrl-u`, `J` / `K`", Action: "Half-page down / up"},
+	{Key: "H / L", READMEKey: "`H` / `L`", Action: "Previous / next commit"},
 	{Key: "]c / [c", READMEKey: "`]c` / `[c`", Action: "Next / previous change"},
 	{Key: "]n / [n", READMEKey: "`]n` / `[n`", Action: "Next / previous note"},
 	{Key: "s", READMEKey: "`s`", Action: "Toggle side-by-side view"},
@@ -464,13 +464,13 @@ func (d *diffViewer) handleKey(key vaxis.Key) (Command, error) {
 		d.keys.Clear()
 		d.cursorBottom()
 		return CommandRedraw, nil
-	case key.Matches('J'):
+	case key.Matches('L'):
 		d.keys.Clear()
 		if !d.jumpCommit(1) {
 			return CommandNone, nil
 		}
 		return CommandRedraw, nil
-	case key.Matches('K'):
+	case key.Matches('H'):
 		d.keys.Clear()
 		if !d.jumpCommit(-1) {
 			return CommandNone, nil
@@ -483,9 +483,9 @@ func (d *diffViewer) handleKey(key vaxis.Key) (Command, error) {
 		d.keys.Clear()
 		d.cursorTop()
 		return CommandRedraw, nil
-	case key.Matches('d', vaxis.ModCtrl), key.Matches(vaxis.KeyPgDown):
+	case key.Matches('d', vaxis.ModCtrl), key.Matches(vaxis.KeyPgDown), key.Matches('J'):
 		d.keys.Clear()
-		d.moveCursorRows(d.halfPage())
+		d.moveCursorRowsCentered(d.halfPage())
 		return CommandRedraw, nil
 	case key.Matches('d'):
 		if d.keys.Pending() == "d" {
@@ -494,9 +494,9 @@ func (d *diffViewer) handleKey(key vaxis.Key) (Command, error) {
 		}
 		d.keys.Set("d", time.Now())
 		return CommandNone, nil
-	case key.Matches('u', vaxis.ModCtrl), key.Matches(vaxis.KeyPgUp):
+	case key.Matches('u', vaxis.ModCtrl), key.Matches(vaxis.KeyPgUp), key.Matches('K'):
 		d.keys.Clear()
-		d.moveCursorRows(-d.halfPage())
+		d.moveCursorRowsCentered(-d.halfPage())
 		return CommandRedraw, nil
 	case key.Matches('j'), key.Matches(vaxis.KeyDown), key.MatchString("Down"):
 		d.keys.Clear()
@@ -5532,6 +5532,21 @@ func (d *diffViewer) moveCursorRows(delta int) {
 	d.cursor.Col = d.clampCursorCol(d.cursor.Row, d.cursorGoal)
 	d.ensureCursorRowVisible()
 	d.updateVisualSelection()
+}
+
+func (d *diffViewer) moveCursorRowsCentered(delta int) {
+	d.moveCursorRows(delta)
+	d.centerCursorRow()
+}
+
+func (d *diffViewer) centerCursorRow() {
+	visible := d.visibleRowCapacity()
+	if visible <= 0 || len(d.rows) == 0 {
+		return
+	}
+	d.scroll = d.cursor.Row - visible/2
+	d.clampScroll()
+	d.ensureCursorRowVisible()
 }
 
 func (d *diffViewer) moveSideBySideCursorRows(delta int) {

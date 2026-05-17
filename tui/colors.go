@@ -70,14 +70,14 @@ type ColorScheme struct {
 
 func DefaultBaseColors() BaseColors {
 	return BaseColors{
-		Foreground: vaxis.RGBColor(0xd7, 0xde, 0xe9),
-		Background: vaxis.RGBColor(0x10, 0x14, 0x19),
-		Red:        vaxis.RGBColor(0xe0, 0x6c, 0x75),
-		Green:      vaxis.RGBColor(0x98, 0xc3, 0x79),
-		Yellow:     vaxis.RGBColor(0xe5, 0xc0, 0x7b),
-		Blue:       vaxis.RGBColor(0x61, 0xaf, 0xef),
-		Magenta:    vaxis.RGBColor(0xc6, 0x78, 0xdd),
-		Cyan:       vaxis.RGBColor(0x56, 0xb6, 0xc2),
+		Foreground: vaxis.RGBColor(0xdd, 0xdd, 0xdd),
+		Background: vaxis.RGBColor(0x22, 0x21, 0x2c),
+		Red:        vaxis.RGBColor(0xed, 0x91, 0xb1),
+		Green:      vaxis.RGBColor(0x00, 0xff, 0xaa),
+		Yellow:     vaxis.RGBColor(0xd6, 0xc5, 0xa5),
+		Blue:       vaxis.RGBColor(0xcd, 0xc1, 0xff),
+		Magenta:    vaxis.RGBColor(0xff, 0x80, 0xbf),
+		Cyan:       vaxis.RGBColor(0x88, 0x88, 0x88),
 	}
 }
 
@@ -121,9 +121,8 @@ func (s *ColorScheme) ApplyTerminalColors(colors TerminalColors) {
 	if colors.Cyan != vaxis.ColorDefault {
 		s.Base.Cyan = colors.Cyan
 	}
-	if colors.Blue != vaxis.ColorDefault {
-		s.Base.Blue = colors.Blue
-	}
+	// Keep comview's built-in blue/accent color instead of inheriting the
+	// terminal ANSI blue. This is used for function names and NORMAL mode.
 	if colors.Yellow != vaxis.ColorDefault {
 		s.Base.Yellow = colors.Yellow
 	}

@@ -35,8 +35,8 @@ Comments are saved to `.comview/comments.json`.
 | `j`/`k`, arrows | Move |
 | `h`/`l` | Move horizontally |
 | `gg` / `G` | Top / bottom |
-| `Ctrl-d` / `Ctrl-u` | Half-page down / up |
-| `J` / `K` | Next / previous commit |
+| `Ctrl-d` / `Ctrl-u`, `J` / `K` | Half-page down / up |
+| `H` / `L` | Previous / next commit |
 | `]c` / `[c` | Next / previous change |
 | `]n` / `[n` | Next / previous note |
 | `s` | Toggle side-by-side view |
