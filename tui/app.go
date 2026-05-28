@@ -21,6 +21,8 @@ const yankHighlightDuration = 180 * time.Millisecond
 const statusMessageTimeout = 2 * time.Second
 const mouseWheelScrollLines = 1
 const mouseWheelScrollColumns = 1
+const eagerRenderCacheRows = 200
+const syntaxHighlightFileRowLimit = 2000
 const scrollbarWidth = 1
 const commentTextMaxWidth = 72
 const verticalScrollbarThumb = "█"
@@ -83,6 +85,7 @@ type diffViewer struct {
 	diffStatLayout     diffStatLayout
 	codeSegments       [][]vaxis.Segment
 	fileRows           []int
+	fileCodeRowCounts  map[string]int
 	layoutMode         diffLayoutMode
 	cursor             selectionPoint
 	cursorGoal         int
@@ -890,7 +893,7 @@ func (d *diffViewer) paintStackedRows(win vaxis.Window) {
 
 	screenRow := 0
 	for docRow := d.scroll; docRow < len(d.rows) && screenRow < visible; docRow++ {
-		d.printRow(win, screenRow, docRow, d.rows[docRow], d.codeSegments[docRow], docRow == d.cursor.Row)
+		d.printRow(win, screenRow, docRow, d.rows[docRow], d.codeSegmentsForRow(docRow), docRow == d.cursor.Row)
 		d.paintSelection(win, screenRow, docRow)
 		screenRow++
 		if screenRow >= visible {
@@ -978,6 +981,12 @@ func (d *diffViewer) cursorScreenPositionForSize(width int, height int) (int, in
 }
 
 func (d *diffViewer) screenRowForDocRow(docRow int, width int, height int) int {
+	if d.layoutMode != layoutSideBySide && d.editor == nil && len(d.reviewDrafts) == 0 {
+		if docRow < d.scroll {
+			return -1
+		}
+		return docRow - d.scroll
+	}
 	if d.layoutMode == layoutSideBySide {
 		rows := d.sideBySideRows()
 		start := d.sideBySideStart(rows)
@@ -1026,8 +1035,15 @@ func (d *diffViewer) codeOffset(row diff.Row) int {
 }
 
 func (d *diffViewer) codeSegmentsForRow(row int) []vaxis.Segment {
-	if row < 0 || row >= len(d.codeSegments) {
+	if row < 0 || row >= len(d.rows) {
 		return nil
+	}
+	d.ensureRenderCache()
+	if row >= len(d.codeSegments) {
+		return nil
+	}
+	if d.codeSegments[row] == nil {
+		d.codeSegments[row] = d.renderCodeSegments(row)
 	}
 	return d.codeSegments[row]
 }
@@ -1915,6 +1931,9 @@ func (d *diffViewer) reviewDraftBoxRowsForSize(docRow int, draft review.CommentD
 }
 
 func (d *diffViewer) reviewDraftBoxRowsAfterRowForSize(row int, width int, height int) int {
+	if d.editor == nil && len(d.reviewDrafts) == 0 {
+		return 0
+	}
 	rows := 0
 	if d.editor != nil && d.commentEditorTargetRow() == row {
 		rows += d.commentEditorHeightForSize(width, height)
@@ -2483,7 +2502,7 @@ func (d *diffViewer) paintSideBySide(win vaxis.Window) {
 		sideRow := rows[index]
 		if sideRow.Full >= 0 {
 			docRow := sideRow.Full
-			d.printRow(win, screenRow, docRow, d.rows[docRow], d.codeSegments[docRow], docRow == d.cursor.Row)
+			d.printRow(win, screenRow, docRow, d.rows[docRow], d.codeSegmentsForRow(docRow), docRow == d.cursor.Row)
 		} else {
 			if leftWidth > 0 {
 				d.printSideBySideCell(win.New(0, screenRow, leftWidth, 1), sideRow.Left, sideLeft, sideRow.Left == d.cursor.Row)
@@ -2936,25 +2955,55 @@ func (d *diffViewer) ensureRenderCache() {
 	if len(d.codeSegments) == len(d.rows) {
 		return
 	}
-
-	highlightedRows := d.highlighter.HighlightRows(d.rows, d.codeStyle)
 	d.codeSegments = make([][]vaxis.Segment, len(d.rows))
-	for index, row := range d.rows {
-		if row.Code == "" || row.Kind == diff.RowHunk {
-			continue
+	if len(d.rows) <= eagerRenderCacheRows {
+		for index := range d.rows {
+			d.codeSegments[index] = d.renderCodeSegments(index)
 		}
-
-		segments := highlightedRows[index]
-		if len(segments) == 0 {
-			segments = d.highlighter.Highlight(row.FileName, row.Code, d.codeStyle(row.Kind))
-		}
-		d.codeSegments[index] = applyInlineSpans(segments, row.InlineSpans, d.inlineBackground(row.Kind))
 	}
+}
+
+func (d *diffViewer) renderCodeSegments(index int) []vaxis.Segment {
+	if index < 0 || index >= len(d.rows) {
+		return nil
+	}
+	row := d.rows[index]
+	if row.Code == "" || row.Kind == diff.RowHunk {
+		return nil
+	}
+	segments := []vaxis.Segment{{Text: row.Code, Style: d.codeStyle(row.Kind)}}
+	if d.highlighter != nil && !d.skipSyntaxHighlight(row.FileName) {
+		segments = d.highlighter.Highlight(row.FileName, row.Code, d.codeStyle(row.Kind))
+	}
+	return applyInlineSpans(segments, row.InlineSpans, d.inlineBackground(row.Kind))
+}
+
+func (d *diffViewer) skipSyntaxHighlight(fileName string) bool {
+	if strings.HasSuffix(fileName, "package-lock.json") {
+		return true
+	}
+	return d.codeRowCount(fileName) > syntaxHighlightFileRowLimit
+}
+
+func (d *diffViewer) codeRowCount(fileName string) int {
+	if fileName == "" {
+		return 0
+	}
+	if d.fileCodeRowCounts == nil {
+		d.fileCodeRowCounts = make(map[string]int)
+		for _, row := range d.rows {
+			if row.FileName != "" && row.Code != "" && row.Kind != diff.RowHunk {
+				d.fileCodeRowCounts[row.FileName]++
+			}
+		}
+	}
+	return d.fileCodeRowCounts[fileName]
 }
 
 func (d *diffViewer) invalidateRenderCache() {
 	d.codeSegments = nil
 	d.fileRows = nil
+	d.fileCodeRowCounts = nil
 	d.contentWide = 0
 	d.diffStatLayout = diffStatLayout{}
 }
@@ -6086,6 +6135,9 @@ func (d *diffViewer) maxScrollForVisibleRows(visible int, width int, height int)
 	if len(d.rows) == 0 || visible <= 0 {
 		return 0
 	}
+	if d.editor == nil && len(d.reviewDrafts) == 0 {
+		return maxInt(0, len(d.rows)-visible)
+	}
 	totalRows := d.totalDisplayRowsForSize(width, height)
 	threshold := totalRows - visible
 	if threshold <= 0 {
@@ -6104,6 +6156,9 @@ func (d *diffViewer) maxScrollForVisibleRows(visible int, width int, height int)
 }
 
 func (d *diffViewer) totalDisplayRowsForSize(width int, height int) int {
+	if d.editor == nil && len(d.reviewDrafts) == 0 {
+		return len(d.rows)
+	}
 	rows := len(d.rows)
 	for row := range d.rows {
 		rows += d.reviewDraftBoxRowsAfterRowForSize(row, width, height)

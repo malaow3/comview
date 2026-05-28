@@ -71,10 +71,14 @@ func PairChangedRows(deletes []Row, adds []Row) []RowPair {
 const (
 	minInlineLineSimilarity = 0.45
 	leadingTokenMatchBonus  = 0.5
+	maxInlineLinePairs      = 10000
 )
 
 func inlineLinePairs(deletes []Line, adds []Line) []inlineLinePair {
 	if len(deletes) == 0 || len(adds) == 0 {
+		return nil
+	}
+	if len(deletes)*len(adds) > maxInlineLinePairs {
 		return nil
 	}
 

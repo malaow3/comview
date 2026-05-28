@@ -76,7 +76,7 @@ func DefaultBaseColors() BaseColors {
 		Green:      vaxis.RGBColor(0x00, 0xff, 0xaa),
 		Yellow:     vaxis.RGBColor(0xd6, 0xc5, 0xa5),
 		Blue:       vaxis.RGBColor(0xcd, 0xc1, 0xff),
-		Magenta:    vaxis.RGBColor(0xff, 0x80, 0xbf),
+		Magenta:    vaxis.RGBColor(0xcd, 0xc1, 0xff),
 		Cyan:       vaxis.RGBColor(0x88, 0x88, 0x88),
 	}
 }
@@ -115,9 +115,8 @@ func (s *ColorScheme) ApplyTerminalColors(colors TerminalColors) {
 	if colors.Green != vaxis.ColorDefault {
 		s.Base.Green = colors.Green
 	}
-	if colors.Magenta != vaxis.ColorDefault {
-		s.Base.Magenta = colors.Magenta
-	}
+	// Keep comview's built-in magenta/accent color instead of inheriting the
+	// terminal ANSI magenta, which can be too close to red in some themes.
 	if colors.Cyan != vaxis.ColorDefault {
 		s.Base.Cyan = colors.Cyan
 	}
@@ -165,16 +164,35 @@ type TerminalColorReceiver interface {
 }
 
 func QueryTerminalColors(vx *vaxis.Vaxis) TerminalColors {
-	return TerminalColors{
-		Foreground: queryTerminalColor(vx.CanReportForegroundColor(), vx.QueryForeground),
-		Background: queryTerminalBackground(vx),
-		Red:        queryIndexedTerminalColor(vx, 1),
-		Green:      queryIndexedTerminalColor(vx, 2),
-		Yellow:     queryIndexedTerminalColor(vx, 3),
-		Blue:       queryIndexedTerminalColor(vx, 4),
-		Magenta:    queryIndexedTerminalColor(vx, 5),
-		Cyan:       queryIndexedTerminalColor(vx, 6),
+	type result struct {
+		apply func(*TerminalColors, vaxis.Color)
+		color vaxis.Color
 	}
+	queries := []struct {
+		apply func(*TerminalColors, vaxis.Color)
+		query func() vaxis.Color
+	}{
+		{func(colors *TerminalColors, color vaxis.Color) { colors.Foreground = color }, func() vaxis.Color { return queryTerminalColor(vx.CanReportForegroundColor(), vx.QueryForeground) }},
+		{func(colors *TerminalColors, color vaxis.Color) { colors.Background = color }, func() vaxis.Color { return queryTerminalBackground(vx) }},
+		{func(colors *TerminalColors, color vaxis.Color) { colors.Red = color }, func() vaxis.Color { return queryIndexedTerminalColor(vx, 1) }},
+		{func(colors *TerminalColors, color vaxis.Color) { colors.Green = color }, func() vaxis.Color { return queryIndexedTerminalColor(vx, 2) }},
+		{func(colors *TerminalColors, color vaxis.Color) { colors.Yellow = color }, func() vaxis.Color { return queryIndexedTerminalColor(vx, 3) }},
+		{func(colors *TerminalColors, color vaxis.Color) { colors.Cyan = color }, func() vaxis.Color { return queryIndexedTerminalColor(vx, 6) }},
+	}
+
+	results := make(chan result, len(queries))
+	for _, query := range queries {
+		go func() {
+			results <- result{apply: query.apply, color: query.query()}
+		}()
+	}
+
+	colors := TerminalColors{}
+	for range queries {
+		result := <-results
+		result.apply(&colors, result.color)
+	}
+	return colors
 }
 
 func queryTerminalBackground(vx *vaxis.Vaxis) vaxis.Color {
