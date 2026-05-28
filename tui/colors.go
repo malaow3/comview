@@ -164,35 +164,10 @@ type TerminalColorReceiver interface {
 }
 
 func QueryTerminalColors(vx *vaxis.Vaxis) TerminalColors {
-	type result struct {
-		apply func(*TerminalColors, vaxis.Color)
-		color vaxis.Color
+	return TerminalColors{
+		Foreground: queryTerminalColor(vx.CanReportForegroundColor(), vx.QueryForeground),
+		Background: queryTerminalBackground(vx),
 	}
-	queries := []struct {
-		apply func(*TerminalColors, vaxis.Color)
-		query func() vaxis.Color
-	}{
-		{func(colors *TerminalColors, color vaxis.Color) { colors.Foreground = color }, func() vaxis.Color { return queryTerminalColor(vx.CanReportForegroundColor(), vx.QueryForeground) }},
-		{func(colors *TerminalColors, color vaxis.Color) { colors.Background = color }, func() vaxis.Color { return queryTerminalBackground(vx) }},
-		{func(colors *TerminalColors, color vaxis.Color) { colors.Red = color }, func() vaxis.Color { return queryIndexedTerminalColor(vx, 1) }},
-		{func(colors *TerminalColors, color vaxis.Color) { colors.Green = color }, func() vaxis.Color { return queryIndexedTerminalColor(vx, 2) }},
-		{func(colors *TerminalColors, color vaxis.Color) { colors.Yellow = color }, func() vaxis.Color { return queryIndexedTerminalColor(vx, 3) }},
-		{func(colors *TerminalColors, color vaxis.Color) { colors.Cyan = color }, func() vaxis.Color { return queryIndexedTerminalColor(vx, 6) }},
-	}
-
-	results := make(chan result, len(queries))
-	for _, query := range queries {
-		go func() {
-			results <- result{apply: query.apply, color: query.query()}
-		}()
-	}
-
-	colors := TerminalColors{}
-	for range queries {
-		result := <-results
-		result.apply(&colors, result.color)
-	}
-	return colors
 }
 
 func queryTerminalBackground(vx *vaxis.Vaxis) vaxis.Color {

@@ -6707,11 +6707,16 @@ func appendSegment(segments []vaxis.Segment, segment vaxis.Segment) []vaxis.Segm
 }
 
 func textCellWidth(text string) int {
-	width := 0
-	for _, char := range vaxis.Characters(text) {
-		width += char.Width
+	for index := 0; index < len(text); index++ {
+		if text[index] >= utf8.RuneSelf || text[index] < ' ' {
+			width := index
+			for _, char := range vaxis.Characters(text[index:]) {
+				width += char.Width
+			}
+			return width
+		}
 	}
-	return width
+	return len(text)
 }
 
 func editorColumnAtCell(text string, target int) int {
