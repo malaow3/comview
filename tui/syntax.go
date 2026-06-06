@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"git.sr.ht/~rockorager/vaxis"
 	"github.com/alecthomas/chroma/v2"
@@ -189,48 +190,58 @@ func (h *SyntaxHighlighter) lexerFor(fileName string) chroma.Lexer {
 
 func matchFastLexer(fileName string) chroma.Lexer {
 	if strings.HasSuffix(fileName, ".go") || fileName == "go.mod" || fileName == "go.sum" {
-		return goLexer
+		return fastGoLexer()
 	}
 	return nil
 }
 
-var goLexer = chroma.Coalesce(chroma.MustNewLexer(
-	&chroma.Config{
-		Name:      "Go",
-		Aliases:   []string{"go", "golang"},
-		Filenames: []string{"*.go", "go.mod", "go.sum"},
-		MimeTypes: []string{"text/x-gosrc"},
-	},
-	func() chroma.Rules {
-		return chroma.Rules{
-			"root": {
-				{Pattern: `\s+`, Type: chroma.Text, Mutator: nil},
-				{Pattern: `//.*?$`, Type: chroma.CommentSingle, Mutator: nil},
-				{Pattern: `/\*`, Type: chroma.CommentMultiline, Mutator: chroma.Push("comment")},
-				{Pattern: "`", Type: chroma.LiteralStringBacktick, Mutator: chroma.Push("rawstring")},
-				{Pattern: `\"(\\.|[^\"\\])*\"`, Type: chroma.LiteralStringDouble, Mutator: nil},
-				{Pattern: `'(?:\\.|[^'\\])+'`, Type: chroma.LiteralStringChar, Mutator: nil},
-				{Pattern: `\b(break|case|chan|const|continue|default|defer|else|fallthrough|for|func|go|goto|if|import|interface|map|package|range|return|select|struct|switch|type|var)\b`, Type: chroma.Keyword, Mutator: nil},
-				{Pattern: `\b(bool|byte|complex64|complex128|error|float32|float64|int|int8|int16|int32|int64|rune|string|uint|uint8|uint16|uint32|uint64|uintptr)\b`, Type: chroma.KeywordType, Mutator: nil},
-				{Pattern: `\b(true|false|iota|nil)\b`, Type: chroma.KeywordConstant, Mutator: nil},
-				{Pattern: `\b[0-9](?:[0-9a-fA-F_xXoObB\.]*[0-9a-fA-F])?\b`, Type: chroma.LiteralNumber, Mutator: nil},
-				{Pattern: `[{}()[\].,;:]`, Type: chroma.Punctuation, Mutator: nil},
-				{Pattern: `[-+*/%=!<>&|^~?]+`, Type: chroma.Operator, Mutator: nil},
-				{Pattern: `[A-Za-z_][A-Za-z0-9_]*`, Type: chroma.Name, Mutator: nil},
+var (
+	goLexerOnce sync.Once
+	goLexer     chroma.Lexer
+)
+
+func fastGoLexer() chroma.Lexer {
+	goLexerOnce.Do(func() {
+		goLexer = chroma.Coalesce(chroma.MustNewLexer(
+			&chroma.Config{
+				Name:      "Go",
+				Aliases:   []string{"go", "golang"},
+				Filenames: []string{"*.go", "go.mod", "go.sum"},
+				MimeTypes: []string{"text/x-gosrc"},
 			},
-			"comment": {
-				{Pattern: `[^*/]+`, Type: chroma.CommentMultiline, Mutator: nil},
-				{Pattern: `/\*`, Type: chroma.CommentMultiline, Mutator: chroma.Push("comment")},
-				{Pattern: `\*/`, Type: chroma.CommentMultiline, Mutator: chroma.Pop(1)},
-				{Pattern: `[*/]`, Type: chroma.CommentMultiline, Mutator: nil},
+			func() chroma.Rules {
+				return chroma.Rules{
+					"root": {
+						{Pattern: `\s+`, Type: chroma.Text, Mutator: nil},
+						{Pattern: `//.*?$`, Type: chroma.CommentSingle, Mutator: nil},
+						{Pattern: `/\*`, Type: chroma.CommentMultiline, Mutator: chroma.Push("comment")},
+						{Pattern: "`", Type: chroma.LiteralStringBacktick, Mutator: chroma.Push("rawstring")},
+						{Pattern: `\"(\\.|[^\"\\])*\"`, Type: chroma.LiteralStringDouble, Mutator: nil},
+						{Pattern: `'(?:\\.|[^'\\])+'`, Type: chroma.LiteralStringChar, Mutator: nil},
+						{Pattern: `\b(break|case|chan|const|continue|default|defer|else|fallthrough|for|func|go|goto|if|import|interface|map|package|range|return|select|struct|switch|type|var)\b`, Type: chroma.Keyword, Mutator: nil},
+						{Pattern: `\b(bool|byte|complex64|complex128|error|float32|float64|int|int8|int16|int32|int64|rune|string|uint|uint8|uint16|uint32|uint64|uintptr)\b`, Type: chroma.KeywordType, Mutator: nil},
+						{Pattern: `\b(true|false|iota|nil)\b`, Type: chroma.KeywordConstant, Mutator: nil},
+						{Pattern: `\b[0-9](?:[0-9a-fA-F_xXoObB\.]*[0-9a-fA-F])?\b`, Type: chroma.LiteralNumber, Mutator: nil},
+						{Pattern: `[{}()[\].,;:]`, Type: chroma.Punctuation, Mutator: nil},
+						{Pattern: `[-+*/%=!<>&|^~?]+`, Type: chroma.Operator, Mutator: nil},
+						{Pattern: `[A-Za-z_][A-Za-z0-9_]*`, Type: chroma.Name, Mutator: nil},
+					},
+					"comment": {
+						{Pattern: `[^*/]+`, Type: chroma.CommentMultiline, Mutator: nil},
+						{Pattern: `/\*`, Type: chroma.CommentMultiline, Mutator: chroma.Push("comment")},
+						{Pattern: `\*/`, Type: chroma.CommentMultiline, Mutator: chroma.Pop(1)},
+						{Pattern: `[*/]`, Type: chroma.CommentMultiline, Mutator: nil},
+					},
+					"rawstring": {
+						{Pattern: "[^`]+", Type: chroma.LiteralStringBacktick, Mutator: nil},
+						{Pattern: "`", Type: chroma.LiteralStringBacktick, Mutator: chroma.Pop(1)},
+					},
+				}
 			},
-			"rawstring": {
-				{Pattern: "[^`]+", Type: chroma.LiteralStringBacktick, Mutator: nil},
-				{Pattern: "`", Type: chroma.LiteralStringBacktick, Mutator: chroma.Pop(1)},
-			},
-		}
-	},
-))
+		))
+	})
+	return goLexer
+}
 
 func (h *SyntaxHighlighter) styleFor(tokenType chroma.TokenType, base vaxis.Style) vaxis.Style {
 	style := base

@@ -19,6 +19,7 @@ const pendingKeyTimeout = 800 * time.Millisecond
 const multiClickTimeout = 500 * time.Millisecond
 const yankHighlightDuration = 180 * time.Millisecond
 const statusMessageTimeout = 2 * time.Second
+const terminalInitTimeout = 150 * time.Millisecond
 const mouseWheelScrollLines = 1
 const mouseWheelScrollColumns = 1
 const eagerRenderCacheRows = 200
@@ -59,6 +60,7 @@ func Run(input string) error {
 		highlighter:  NewSyntaxHighlighter(),
 	}, vaxis.Options{
 		CSIuBitMask: keyboardFlags,
+		InitTimeout: terminalInitTimeout,
 	})
 	if err != nil {
 		return err
