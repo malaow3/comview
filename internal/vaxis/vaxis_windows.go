@@ -46,6 +46,8 @@ func (vx *Vaxis) winch() {
 	}
 }
 
+func (vx *Vaxis) drainPendingInput() {}
+
 func (vx *Vaxis) reportWinsize() (Resize, error) {
 	if vx.caps.reportSizeChars && vx.caps.reportSizePixels {
 		log.Trace("requesting screen size from terminal")

@@ -1513,6 +1513,7 @@ func (vx *Vaxis) Suspend() error {
 	vx.parser.Close()
 	vx.writeControlString(primaryAttributes)
 	vx.parser.WaitClose()
+	vx.drainPendingInput()
 
 	vx.disableModes()
 	vx.exitAltScreen()

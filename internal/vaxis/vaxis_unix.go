@@ -32,6 +32,37 @@ func (vx *Vaxis) setupSignals() {
 }
 
 // reportWinsize
+func (vx *Vaxis) drainPendingInput() {
+	fd := int(vx.console.Fd())
+	flags, err := unix.FcntlInt(uintptr(fd), unix.F_GETFL, 0)
+	if err != nil {
+		return
+	}
+	wasNonblock := flags&unix.O_NONBLOCK != 0
+	if !wasNonblock {
+		if err := unix.SetNonblock(fd, true); err != nil {
+			return
+		}
+		defer func() { _, _ = unix.FcntlInt(uintptr(fd), unix.F_SETFL, flags) }()
+	}
+
+	buf := make([]byte, 64)
+	deadline := time.Now().Add(20 * time.Millisecond)
+	for {
+		_, err := unix.Read(fd, buf)
+		if err == unix.EAGAIN || err == unix.EWOULDBLOCK {
+			if time.Now().After(deadline) {
+				return
+			}
+			time.Sleep(time.Millisecond)
+			continue
+		}
+		if err != nil {
+			return
+		}
+	}
+}
+
 func (vx *Vaxis) reportWinsize() (Resize, error) {
 	if vx.caps.inBandResize {
 		// We already received the size if we have in band reports
